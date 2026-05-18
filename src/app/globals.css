@@ -1,0 +1,78 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-display: 'Playfair Display', serif;
+  --font-body: 'DM Sans', sans-serif;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: #FAFAF7;
+  color: #1A2B2B;
+}
+
+/* Star rating */
+.star-btn {
+  @apply transition-all duration-150 cursor-pointer;
+  font-size: 2rem;
+}
+.star-btn:hover,
+.star-btn.active {
+  filter: drop-shadow(0 0 4px rgba(196,154,34,0.5));
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #E0F5F5; }
+::-webkit-scrollbar-thumb { background: #007C7C; border-radius: 3px; }
+
+/* Shared button & input styles */
+.btn-primary {
+  background: #007C7C;
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.875rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: all 0.15s;
+  text-align: center;
+}
+.btn-primary:hover {
+  background: #005858;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,124,124,0.3);
+}
+.btn-outline {
+  background: white;
+  color: #007C7C;
+  border: 1.5px solid #007C7C;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.875rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: all 0.15s;
+  text-align: center;
+}
+.btn-outline:hover {
+  background: #E0F5F5;
+}
+.input-field {
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  border: 1.5px solid #D4E5E5;
+  border-radius: 0.75rem;
+  background: #FAFAF7;
+  font-size: 0.9rem;
+  color: #1A2B2B;
+  outline: none;
+  transition: border-color 0.15s;
+  font-family: var(--font-body);
+}
+.input-field:focus {
+  border-color: #007C7C;
+  background: white;
+}

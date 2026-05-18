@@ -1,0 +1,35 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Survey {
+  id                String   @id @default(cuid())
+  createdAt         DateTime @default(now())
+  
+  // Identitas
+  bulanPenilaian    String
+  usiaJenisPasien   String
+  namaPasien        String
+  tanggalPenilaian  DateTime
+  ruangRawat        String
+  
+  // Penilaian (1-5)
+  nilaiTampilan     Int      // Tampilan makanan
+  nilaiKebersihan   Int      // Kebersihan penyajian
+  nilaiRasa         Int      // Rasa makanan
+  nilaiWaktu        Int      // Waktu penyajian
+  nilaiVariasi      Int      // Variasi makanan
+  
+  // Keluhan & Saran
+  keluhanDi         String?  // Makan pagi / siang / malam / snack
+  kritikSaran       String?
+
+  @@map("surveys")
+}
