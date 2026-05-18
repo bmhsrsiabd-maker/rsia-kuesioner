@@ -5,11 +5,12 @@ const PAGE_SIZE = 15
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
-  const pwd    = searchParams.get('pwd')
-  const bulan  = searchParams.get('bulan') ?? ''
-  const tahun  = parseInt(searchParams.get('tahun') ?? String(new Date().getFullYear()))
-  const page   = Math.max(1, parseInt(searchParams.get('page') ?? '1'))
-  const search = searchParams.get('search') ?? ''
+  const pwd             = searchParams.get('pwd')
+  const bulan           = searchParams.get('bulan') ?? ''
+  const tahun           = parseInt(searchParams.get('tahun') ?? String(new Date().getFullYear()))
+  const page            = Math.max(1, parseInt(searchParams.get('page') ?? '1'))
+  const search          = searchParams.get('search') ?? ''
+  const usiaJenisPasien = searchParams.get('usiaJenisPasien') ?? ''
 
   if (pwd !== (process.env.ADMIN_PASSWORD ?? 'rsia2026')) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -21,7 +22,8 @@ export async function GET(req: NextRequest) {
       gte: new Date(tahun, 0, 1),
       lt:  new Date(tahun + 1, 0, 1),
     },
-    ...(bulan  ? { bulanPenilaian: bulan } : {}),
+    ...(bulan           ? { bulanPenilaian: bulan } : {}),
+    ...(usiaJenisPasien ? { usiaJenisPasien }       : {}),
     ...(search ? {
       OR: [
         { namaPasien: { contains: search, mode: 'insensitive' as const } },

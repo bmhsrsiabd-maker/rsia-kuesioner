@@ -10,6 +10,7 @@ const BULAN = [
   'JANUARI','FEBRUARI','MARET','APRIL','MEI','JUNI',
   'JULI','AGUSTUS','SEPTEMBER','OKTOBER','NOVEMBER','DESEMBER',
 ]
+const USIA_JENIS = ['Bayi','Anak','Dewasa','Lansia','Pendamping pasien']
 
 const ASPEK = [
   { key: 'nilaiTampilan',  label: 'Tampilan Makanan',   icon: '🍽️' },
@@ -170,6 +171,7 @@ export default function RekapPage() {
   const [mode, setMode] = useState<'bulan' | 'tahun'>('bulan')
   const [bulan, setBulan] = useState(BULAN[now.getMonth()])
   const [tahun, setTahun] = useState(now.getFullYear())
+  const [usia, setUsia]   = useState('')
 
   const [data, setData] = useState<RekapResult | null>(null)
   const [loading, setLoading] = useState(false)
@@ -178,9 +180,10 @@ export default function RekapPage() {
 
   useEffect(() => { setMounted(true) }, [])
 
-  async function callApi(password: string, m: 'bulan' | 'tahun', b: string, t: number) {
+  async function callApi(password: string, m: 'bulan' | 'tahun', b: string, t: number, u: string) {
     const params = new URLSearchParams({ pwd: password, mode: m, tahun: String(t) })
     if (m === 'bulan') params.set('bulan', b)
+    if (u) params.set('usiaJenisPasien', u)
     return fetch(`/api/admin/rekap?${params}`)
   }
 
@@ -188,7 +191,7 @@ export default function RekapPage() {
     setLoginLoading(true)
     setLoginErr('')
     try {
-      const res = await callApi(pwd, mode, bulan, tahun)
+      const res = await callApi(pwd, mode, bulan, tahun, usia)
       if (res.status === 401) { setLoginErr('Password salah.'); return }
       if (!res.ok) throw new Error()
       setData(await res.json())
@@ -204,7 +207,7 @@ export default function RekapPage() {
     setLoading(true)
     setError('')
     try {
-      const res = await callApi(pwd, mode, bulan, tahun)
+      const res = await callApi(pwd, mode, bulan, tahun, usia)
       if (res.status === 401) { setAuthed(false); return }
       if (!res.ok) throw new Error()
       setData(await res.json())
@@ -323,6 +326,15 @@ export default function RekapPage() {
               className="px-3 py-2 border border-rsia-border rounded-xl text-sm text-rsia-dark bg-white outline-none focus:border-rsia-teal"
             >
               {TAHUN_LIST.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+
+            <select
+              value={usia}
+              onChange={e => setUsia(e.target.value)}
+              className="px-3 py-2 border border-rsia-border rounded-xl text-sm text-rsia-dark bg-white outline-none focus:border-rsia-teal"
+            >
+              <option value="">Semua Pasien</option>
+              {USIA_JENIS.map(u => <option key={u} value={u}>{u}</option>)}
             </select>
 
             <button

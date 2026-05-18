@@ -7,6 +7,7 @@ const BULAN = [
   '','JANUARI','FEBRUARI','MARET','APRIL','MEI','JUNI',
   'JULI','AGUSTUS','SEPTEMBER','OKTOBER','NOVEMBER','DESEMBER',
 ]
+const USIA_JENIS = ['Bayi','Anak','Dewasa','Lansia','Pendamping pasien']
 const NOW        = new Date()
 const THIS_YEAR  = NOW.getFullYear()
 const YEARS      = [THIS_YEAR - 1, THIS_YEAR, THIS_YEAR + 1]
@@ -120,6 +121,7 @@ export default function AdminPage() {
 
   const [bulan, setBulan]   = useState('')
   const [tahun, setTahun]   = useState(THIS_YEAR)
+  const [usia, setUsia]     = useState('')
   const [page, setPage]     = useState(1)
   const [search, setSearch] = useState('')
   const [searchInput, setSearchInput] = useState('')
@@ -127,7 +129,7 @@ export default function AdminPage() {
 
   const fetchData = useCallback(async (
     password: string,
-    opts: { bulan?: string; tahun?: number; page?: number; search?: string } = {}
+    opts: { bulan?: string; tahun?: number; usia?: string; page?: number; search?: string } = {}
   ) => {
     setLoading(true)
     setError('')
@@ -136,6 +138,7 @@ export default function AdminPage() {
       params.set('tahun', String(opts.tahun ?? THIS_YEAR))
       params.set('page',  String(opts.page  ?? 1))
       if (opts.bulan)  params.set('bulan',  opts.bulan)
+      if (opts.usia)   params.set('usiaJenisPasien', opts.usia)
       if (opts.search) params.set('search', opts.search)
       const res = await fetch(`/api/admin?${params}`)
       if (res.status === 401) { setLoginErr('Password salah.'); setAuthed(false); return }
@@ -171,23 +174,23 @@ export default function AdminPage() {
       const res = await fetch(`/api/admin?pwd=${encodeURIComponent(pwd)}&id=${id}`, { method: 'DELETE' })
       const d = await res.json()
       if (!res.ok) { alert(d.error ?? 'Gagal menghapus data.'); return }
-      await fetchData(pwd, { bulan, tahun, page, search })
+      await fetchData(pwd, { bulan, tahun, usia, page, search })
     } catch {
       alert('Gagal menghapus data.')
     }
   }
 
-  // Re-fetch when bulan/tahun changes → reset page
+  // Re-fetch when bulan/tahun/usia changes → reset page
   useEffect(() => {
     if (!authed) return
     setPage(1)
-    fetchData(pwd, { bulan, tahun, page: 1, search })
-  }, [bulan, tahun]) // eslint-disable-line react-hooks/exhaustive-deps
+    fetchData(pwd, { bulan, tahun, usia, page: 1, search })
+  }, [bulan, tahun, usia]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Re-fetch when page changes
   useEffect(() => {
     if (!authed) return
-    fetchData(pwd, { bulan, tahun, page, search })
+    fetchData(pwd, { bulan, tahun, usia, page, search })
   }, [page]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Debounce search input → reset page
@@ -197,7 +200,7 @@ export default function AdminPage() {
       if (!authed) return
       setSearch(searchInput)
       setPage(1)
-      fetchData(pwd, { bulan, tahun, page: 1, search: searchInput })
+      fetchData(pwd, { bulan, tahun, usia, page: 1, search: searchInput })
     }, 400)
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [searchInput]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -273,6 +276,14 @@ export default function AdminPage() {
           >
             <option value="">Semua Bulan</option>
             {BULAN.slice(1).map(b => <option key={b} value={b}>{b}</option>)}
+          </select>
+          <select
+            value={usia}
+            onChange={e => setUsia(e.target.value)}
+            className="text-sm bg-white text-rsia-dark border border-white/30 rounded-lg px-3 py-2 outline-none"
+          >
+            <option value="">Semua Pasien</option>
+            {USIA_JENIS.map(u => <option key={u} value={u}>{u}</option>)}
           </select>
         </div>
       </header>

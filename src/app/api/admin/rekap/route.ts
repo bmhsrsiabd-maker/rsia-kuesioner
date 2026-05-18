@@ -16,16 +16,19 @@ const NILAI_LABELS: Record<number, string> = {
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
-  const pwd = searchParams.get('pwd')
-  const mode = searchParams.get('mode') ?? 'bulan'
-  const bulan = searchParams.get('bulan') ?? ''
-  const tahun = parseInt(searchParams.get('tahun') ?? String(new Date().getFullYear()))
+  const pwd             = searchParams.get('pwd')
+  const mode            = searchParams.get('mode') ?? 'bulan'
+  const bulan           = searchParams.get('bulan') ?? ''
+  const tahun           = parseInt(searchParams.get('tahun') ?? String(new Date().getFullYear()))
+  const usiaJenisPasien = searchParams.get('usiaJenisPasien') ?? ''
 
   if (pwd !== (process.env.ADMIN_PASSWORD ?? 'rsia2026')) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   let where: Record<string, unknown> = {}
+
+  const usiaFilter = usiaJenisPasien ? { usiaJenisPasien } : {}
 
   if (mode === 'bulan' && bulan && BULAN_INDEX[bulan] !== undefined) {
     const m = BULAN_INDEX[bulan]
@@ -35,6 +38,7 @@ export async function GET(req: NextRequest) {
         gte: new Date(tahun, m, 1),
         lt: new Date(tahun, m + 1, 1),
       },
+      ...usiaFilter,
     }
   } else {
     where = {
@@ -42,6 +46,7 @@ export async function GET(req: NextRequest) {
         gte: new Date(tahun, 0, 1),
         lt: new Date(tahun + 1, 0, 1),
       },
+      ...usiaFilter,
     }
   }
 
