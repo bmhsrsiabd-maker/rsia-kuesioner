@@ -1,13 +1,16 @@
-// src/app/admin/page.tsx
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 
 const BULAN = [
   '','JANUARI','FEBRUARI','MARET','APRIL','MEI','JUNI',
-  'JULI','AGUSTUS','SEPTEMBER','OKTOBER','NOVEMBER','DESEMBER'
+  'JULI','AGUSTUS','SEPTEMBER','OKTOBER','NOVEMBER','DESEMBER',
 ]
+const NOW        = new Date()
+const THIS_YEAR  = NOW.getFullYear()
+const YEARS      = [THIS_YEAR - 1, THIS_YEAR, THIS_YEAR + 1]
+const PAGE_SIZE  = 15
 
 type Survey = {
   id: string
@@ -29,6 +32,8 @@ type Survey = {
 type AdminData = {
   surveys: Survey[]
   total: number
+  totalPages: number
+  currentPage: number
   avgStats: {
     _avg: {
       nilaiTampilan: number | null
@@ -41,44 +46,101 @@ type AdminData = {
 }
 
 function isDeletable(tanggalPenilaian: string): boolean {
-  const now = new Date()
   const d = new Date(tanggalPenilaian)
-  return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
+  return d.getMonth() === NOW.getMonth() && d.getFullYear() === NOW.getFullYear()
 }
 
-const ASPEK_KEYS = ['nilaiTampilan','nilaiKebersihan','nilaiRasa','nilaiWaktu','nilaiVariasi'] as const
+const ASPEK_KEYS   = ['nilaiTampilan','nilaiKebersihan','nilaiRasa','nilaiWaktu','nilaiVariasi'] as const
 const ASPEK_LABELS: Record<string, string> = {
-  nilaiTampilan: 'Tampilan',
-  nilaiKebersihan: 'Kebersihan',
-  nilaiRasa: 'Rasa',
-  nilaiWaktu: 'Waktu Saji',
-  nilaiVariasi: 'Variasi',
+  nilaiTampilan: 'Tampilan', nilaiKebersihan: 'Kebersihan',
+  nilaiRasa: 'Rasa', nilaiWaktu: 'Waktu Saji', nilaiVariasi: 'Variasi',
 }
 
-function avg(n: number | null) {
-  return n != null ? n.toFixed(2) : '-'
+function avg(n: number | null) { return n != null ? n.toFixed(2) : '-' }
+
+// ── Pagination component ─────────────────────────────────────────────────────
+function Pagination({ current, total, onChange }: { current: number; total: number; onChange: (p: number) => void }) {
+  if (total <= 1) return null
+
+  const pages: (number | '…')[] = []
+  if (total <= 7) {
+    for (let i = 1; i <= total; i++) pages.push(i)
+  } else {
+    pages.push(1)
+    if (current > 3) pages.push('…')
+    for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) pages.push(i)
+    if (current < total - 2) pages.push('…')
+    pages.push(total)
+  }
+
+  const btn = 'w-9 h-9 rounded-lg text-sm font-medium transition-colors flex items-center justify-center'
+  return (
+    <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+      <button
+        onClick={() => onChange(current - 1)}
+        disabled={current === 1}
+        className={`${btn} border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed`}
+      >
+        ←
+      </button>
+      <div className="flex items-center gap-1">
+        {pages.map((p, i) =>
+          p === '…'
+            ? <span key={`e${i}`} className="w-9 h-9 flex items-center justify-center text-gray-400 text-sm">…</span>
+            : <button
+                key={p}
+                onClick={() => onChange(p as number)}
+                className={`${btn} ${p === current ? 'bg-rsia-teal text-white' : 'border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+              >
+                {p}
+              </button>
+        )}
+      </div>
+      <button
+        onClick={() => onChange(current + 1)}
+        disabled={current === total}
+        className={`${btn} border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed`}
+      >
+        →
+      </button>
+    </div>
+  )
 }
 
+// ── Main page ────────────────────────────────────────────────────────────────
 export default function AdminPage() {
-  const [pwd, setPwd] = useState('')
+  const [pwd, setPwd]       = useState('')
   const [authed, setAuthed] = useState(false)
-  const [data, setData] = useState<AdminData | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [bulan, setBulan] = useState('')
-  const [search, setSearch] = useState('')
+  const [loginErr, setLoginErr] = useState('')
+  const [loginLoading, setLoginLoading] = useState(false)
 
-  const fetchData = useCallback(async (password: string, bulanFilter = '') => {
+  const [data, setData]     = useState<AdminData | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError]   = useState('')
+
+  const [bulan, setBulan]   = useState('')
+  const [tahun, setTahun]   = useState(THIS_YEAR)
+  const [page, setPage]     = useState(1)
+  const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState('')
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const fetchData = useCallback(async (
+    password: string,
+    opts: { bulan?: string; tahun?: number; page?: number; search?: string } = {}
+  ) => {
     setLoading(true)
     setError('')
     try {
       const params = new URLSearchParams({ pwd: password })
-      if (bulanFilter) params.set('bulan', bulanFilter)
+      params.set('tahun', String(opts.tahun ?? THIS_YEAR))
+      params.set('page',  String(opts.page  ?? 1))
+      if (opts.bulan)  params.set('bulan',  opts.bulan)
+      if (opts.search) params.set('search', opts.search)
       const res = await fetch(`/api/admin?${params}`)
-      if (res.status === 401) { setError('Password salah.'); setAuthed(false); return }
+      if (res.status === 401) { setLoginErr('Password salah.'); setAuthed(false); return }
       if (!res.ok) throw new Error()
-      const d = await res.json()
-      setData(d)
+      setData(await res.json())
     } catch {
       setError('Gagal memuat data.')
     } finally {
@@ -86,48 +148,72 @@ export default function AdminPage() {
     }
   }, [])
 
+  const handleLogin = async () => {
+    setLoginLoading(true)
+    setLoginErr('')
+    try {
+      const params = new URLSearchParams({ pwd, tahun: String(tahun), page: '1' })
+      const res = await fetch(`/api/admin?${params}`)
+      if (res.status === 401) { setLoginErr('Password salah.'); return }
+      if (!res.ok) throw new Error()
+      setData(await res.json())
+      setAuthed(true)
+    } catch {
+      setLoginErr('Terjadi kesalahan.')
+    } finally {
+      setLoginLoading(false)
+    }
+  }
+
   const handleDelete = async (id: string) => {
     if (!confirm('Hapus data ini? Tindakan tidak dapat dibatalkan.')) return
     try {
       const res = await fetch(`/api/admin?pwd=${encodeURIComponent(pwd)}&id=${id}`, { method: 'DELETE' })
       const d = await res.json()
       if (!res.ok) { alert(d.error ?? 'Gagal menghapus data.'); return }
-      await fetchData(pwd, bulan)
+      await fetchData(pwd, { bulan, tahun, page, search })
     } catch {
       alert('Gagal menghapus data.')
     }
   }
 
-  const handleLogin = async () => {
-    await fetchData(pwd)
-    setAuthed(true)
-  }
-
+  // Re-fetch when bulan/tahun changes → reset page
   useEffect(() => {
-    if (authed) fetchData(pwd, bulan)
-  }, [bulan, authed, pwd, fetchData])
+    if (!authed) return
+    setPage(1)
+    fetchData(pwd, { bulan, tahun, page: 1, search })
+  }, [bulan, tahun]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const filtered = (data?.surveys ?? []).filter(s =>
-    !search || s.namaPasien.toLowerCase().includes(search.toLowerCase()) ||
-    s.ruangRawat.includes(search)
-  )
+  // Re-fetch when page changes
+  useEffect(() => {
+    if (!authed) return
+    fetchData(pwd, { bulan, tahun, page, search })
+  }, [page]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Login screen
-  if (!authed || error === 'Password salah.') {
+  // Debounce search input → reset page
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      if (!authed) return
+      setSearch(searchInput)
+      setPage(1)
+      fetchData(pwd, { bulan, tahun, page: 1, search: searchInput })
+    }, 400)
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  }, [searchInput]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Login screen ───────────────────────────────────────────────────────────
+  if (!authed) {
     return (
       <div className="min-h-screen bg-rsia-dark flex items-center justify-center px-4">
         <div className="bg-white rounded-2xl p-8 w-full max-w-sm shadow-xl animate-fade-up">
           <div className="text-center mb-6">
-            <div className="w-16 h-16 bg-rsia-teal rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">
-              🔐
-            </div>
+            <div className="w-16 h-16 bg-rsia-teal rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">🔐</div>
             <h1 className="font-display text-2xl font-bold text-rsia-dark">Admin Dashboard</h1>
             <p className="text-rsia-gray text-sm mt-1">RSIA Bunda Denpasar · Instalasi Gizi</p>
           </div>
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-600 text-sm mb-4">
-              {error}
-            </div>
+          {loginErr && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-600 text-sm mb-4">{loginErr}</div>
           )}
           <div className="space-y-3">
             <input
@@ -140,10 +226,10 @@ export default function AdminPage() {
             />
             <button
               onClick={handleLogin}
-              disabled={loading || !pwd}
+              disabled={loginLoading || !pwd}
               className="w-full bg-rsia-teal text-white py-3 rounded-xl font-semibold hover:bg-rsia-tealDark transition-colors disabled:opacity-50"
             >
-              {loading ? 'Memuat...' : 'Masuk'}
+              {loginLoading ? 'Memuat...' : 'Masuk'}
             </button>
           </div>
         </div>
@@ -151,30 +237,39 @@ export default function AdminPage() {
     )
   }
 
-  const overallAvg = data ? (
-    ASPEK_KEYS.reduce((sum, k) => sum + (data.avgStats._avg[k] ?? 0), 0) / ASPEK_KEYS.length
-  ).toFixed(2) : '-'
+  const overallAvg = data
+    ? (ASPEK_KEYS.reduce((s, k) => s + (data.avgStats._avg[k] ?? 0), 0) / ASPEK_KEYS.length).toFixed(2)
+    : '-'
+
+  const startRow = data ? (data.currentPage - 1) * PAGE_SIZE + 1 : 1
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Top bar */}
+      {/* Header */}
       <header className="bg-rsia-teal text-white px-6 py-4 flex items-center justify-between">
         <div>
           <p className="text-rsia-tealLight text-xs tracking-widest uppercase">Admin Dashboard</p>
           <h1 className="font-display text-xl font-bold">Rekap Kuesioner Menu Makanan</h1>
-          <p className="text-white/60 text-xs">RSIA Bunda Denpasar 2026</p>
+          <p className="text-white/60 text-xs">RSIA Bunda Denpasar</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           <Link
             href="/admin/rekap"
-            className="flex items-center gap-1.5 text-sm bg-white/15 hover:bg-white/25 text-white border border-white/30 rounded-lg px-3 py-2 transition-colors font-medium"
+            className="text-sm bg-white/15 hover:bg-white/25 text-white border border-white/30 rounded-lg px-3 py-2 transition-colors font-medium"
           >
             📊 Rekap Grafik
           </Link>
           <select
+            value={tahun}
+            onChange={e => setTahun(Number(e.target.value))}
+            className="text-sm bg-white text-rsia-dark border border-white/30 rounded-lg px-3 py-2 outline-none"
+          >
+            {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <select
             value={bulan}
             onChange={e => setBulan(e.target.value)}
-            className="text-sm bg-white text-rsia-dark border border-white/30 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-white/50"
+            className="text-sm bg-white text-rsia-dark border border-white/30 rounded-lg px-3 py-2 outline-none"
           >
             <option value="">Semua Bulan</option>
             {BULAN.slice(1).map(b => <option key={b} value={b}>{b}</option>)}
@@ -183,6 +278,12 @@ export default function AdminPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+        {/* Error */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-700 text-sm">⚠️ {error}</div>
+        )}
+
+        {/* Loading */}
         {loading && (
           <div className="text-center py-12 text-rsia-gray">
             <div className="w-8 h-8 border-2 border-rsia-teal border-t-transparent rounded-full animate-spin mx-auto mb-3" />
@@ -192,12 +293,12 @@ export default function AdminPage() {
 
         {data && !loading && (
           <>
-            {/* Stats cards */}
+            {/* Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <StatCard label="Total Responden" value={data.total.toString()} icon="👥" />
               <StatCard label="Rata-rata Keseluruhan" value={overallAvg} icon="⭐" suffix="/5.0" />
-              <StatCard label="Bulan Filter" value={bulan || 'Semua'} icon="📅" />
-              <StatCard label="Data Ditampilkan" value={filtered.length.toString()} icon="📋" />
+              <StatCard label="Filter" value={`${bulan || 'Semua Bulan'} ${tahun}`} icon="📅" />
+              <StatCard label="Halaman" value={`${data.currentPage} / ${data.totalPages}`} icon="📋" />
             </div>
 
             {/* Avg per aspek */}
@@ -212,10 +313,7 @@ export default function AdminPage() {
                       <p className="text-xs text-rsia-gray mb-1">{ASPEK_LABELS[k]}</p>
                       <div className="text-2xl font-bold font-display text-rsia-teal">{avg(val)}</div>
                       <div className="mt-2 h-2 bg-gray-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-rsia-teal rounded-full transition-all"
-                          style={{ width: `${pct}%` }}
-                        />
+                        <div className="h-full bg-rsia-teal rounded-full transition-all" style={{ width: `${pct}%` }} />
                       </div>
                     </div>
                   )
@@ -223,16 +321,18 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Search */}
+            {/* Search + info */}
             <div className="flex items-center gap-3">
               <input
                 type="text"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
+                value={searchInput}
+                onChange={e => setSearchInput(e.target.value)}
                 placeholder="Cari nama pasien atau nomor ruang..."
                 className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-rsia-teal"
               />
-              <span className="text-sm text-rsia-gray whitespace-nowrap">{filtered.length} data</span>
+              <span className="text-sm text-rsia-gray whitespace-nowrap">
+                {data.total} data · {PAGE_SIZE}/hal
+              </span>
             </div>
 
             {/* Table */}
@@ -256,17 +356,15 @@ export default function AdminPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.map((s, i) => (
+                    {data.surveys.map((s, i) => (
                       <tr key={s.id} className={`border-b border-gray-100 hover:bg-gray-50 ${i % 2 === 0 ? '' : 'bg-gray-50/50'}`}>
-                        <td className="px-4 py-3 text-gray-400 text-xs">{i + 1}</td>
+                        <td className="px-4 py-3 text-gray-400 text-xs">{startRow + i}</td>
                         <td className="px-4 py-3 text-gray-600 whitespace-nowrap text-xs">
                           {new Date(s.tanggalPenilaian).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' })}
                         </td>
                         <td className="px-4 py-3 font-medium text-rsia-dark max-w-[160px] truncate">{s.namaPasien}</td>
                         <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
-                          <span className="px-2 py-0.5 bg-rsia-tealLight text-rsia-teal rounded-full text-xs">
-                            {s.usiaJenisPasien}
-                          </span>
+                          <span className="px-2 py-0.5 bg-rsia-tealLight text-rsia-teal rounded-full text-xs">{s.usiaJenisPasien}</span>
                         </td>
                         <td className="px-4 py-3 text-gray-600 font-mono text-xs">{s.ruangRawat}</td>
                         <td className="px-3 py-3 text-center"><NilaiCell v={s.nilaiTampilan} /></td>
@@ -276,9 +374,7 @@ export default function AdminPage() {
                         <td className="px-3 py-3 text-center"><NilaiCell v={s.nilaiVariasi} /></td>
                         <td className="px-4 py-3 max-w-[200px]">
                           {s.keluhanDi && (
-                            <span className="block text-xs font-medium text-orange-600 mb-0.5">
-                              📍 {s.keluhanDi}
-                            </span>
+                            <span className="block text-xs font-medium text-orange-600 mb-0.5">📍 {s.keluhanDi}</span>
                           )}
                           {s.kritikSaran && (
                             <span className="text-xs text-gray-500 line-clamp-2">{s.kritikSaran}</span>
@@ -301,14 +397,29 @@ export default function AdminPage() {
                     ))}
                   </tbody>
                 </table>
-                {filtered.length === 0 && (
+
+                {data.surveys.length === 0 && (
                   <div className="text-center py-12 text-rsia-gray">
                     <p className="text-3xl mb-2">📭</p>
                     <p>Tidak ada data ditemukan.</p>
                   </div>
                 )}
               </div>
+
+              {/* Pagination */}
+              <Pagination
+                current={data.currentPage}
+                total={data.totalPages}
+                onChange={p => setPage(p)}
+              />
             </div>
+
+            {/* Pagination info */}
+            {data.total > 0 && (
+              <p className="text-center text-xs text-rsia-gray">
+                Menampilkan {startRow}–{Math.min(startRow + PAGE_SIZE - 1, data.total)} dari {data.total} data
+              </p>
+            )}
           </>
         )}
       </main>
