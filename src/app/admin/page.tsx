@@ -373,7 +373,7 @@ export default function AdminPage() {
                         <td className="px-4 py-3 text-gray-600 whitespace-nowrap text-xs">
                           {new Date(s.tanggalPenilaian).toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' })}
                         </td>
-                        <td className="px-4 py-3 font-medium text-rsia-dark max-w-[160px] truncate">{s.namaPasien}</td>
+                        <td className="px-4 py-3 font-medium text-rsia-dark">{s.namaPasien}</td>
                         <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
                           <span className="px-2 py-0.5 bg-rsia-tealLight text-rsia-teal rounded-full text-xs">{s.usiaJenisPasien}</span>
                         </td>
@@ -383,12 +383,12 @@ export default function AdminPage() {
                         <td className="px-3 py-3 text-center"><NilaiCell v={s.nilaiRasa} /></td>
                         <td className="px-3 py-3 text-center"><NilaiCell v={s.nilaiWaktu} /></td>
                         <td className="px-3 py-3 text-center"><NilaiCell v={s.nilaiVariasi} /></td>
-                        <td className="px-4 py-3 max-w-[200px]">
+                        <td className="px-4 py-3 min-w-[200px]">
                           {s.keluhanDi && (
                             <span className="block text-xs font-medium text-orange-600 mb-0.5">📍 {s.keluhanDi}</span>
                           )}
                           {s.kritikSaran && (
-                            <span className="text-xs text-gray-500 line-clamp-2">{s.kritikSaran}</span>
+                            <span className="text-xs text-gray-500">{s.kritikSaran}</span>
                           )}
                         </td>
                         <td className="px-3 py-3 text-center">
